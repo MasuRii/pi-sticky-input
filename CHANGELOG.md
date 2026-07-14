@@ -4,6 +4,9 @@ All notable changes to this extension will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Restored alternate-scroll wheel handling when the editor is empty, allowing terminal-native text selection without enabling full mouse capture.
+
 ## [0.2.0] - 2026-07-03
 
 ### Added

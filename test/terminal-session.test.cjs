@@ -76,12 +76,15 @@ test("mouse tracking can toggle without leaving alternate screen", () => {
   assert.equal(events[0].includes("\x1b[?1049l"), false);
 });
 
-test("arrow key sequences are left for the focused UI instead of sticky history scrolling", () => {
+test("alternate-scroll consumes cursor sequences only when explicitly allowed", () => {
   assert.equal(terminalSession.parseAlternateScrollInput("\x1bOA"), undefined);
   assert.equal(terminalSession.parseAlternateScrollInput("\x1bOB"), undefined);
   assert.equal(terminalSession.parseAlternateScrollInput("\x1b[A"), undefined);
   assert.equal(terminalSession.parseAlternateScrollInput("\x1b[B"), undefined);
-  assert.equal(terminalSession.parseAlternateScrollInput("\x1b[A", { allowCursorKeys: true }), undefined);
+  assert.equal(terminalSession.parseAlternateScrollInput("\x1bOA", { allowCursorKeys: true }), "up");
+  assert.equal(terminalSession.parseAlternateScrollInput("\x1bOB", { allowCursorKeys: true }), "down");
+  assert.equal(terminalSession.parseAlternateScrollInput("\x1b[A", { allowCursorKeys: true }), "up");
+  assert.equal(terminalSession.parseAlternateScrollInput("\x1b[B", { allowCursorKeys: true }), "down");
   assert.equal(terminalSession.getKeyboardScrollRows("\x1b[5;5~", 10), -10);
   assert.equal(terminalSession.getKeyboardScrollRows("\x1b[6;5~", 10), 10);
   assert.equal(terminalSession.getKeyboardScrollRows("\x1b[5;2~", 10), -10);
