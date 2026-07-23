@@ -4,6 +4,9 @@ All notable changes to this extension will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Restored the primary screen before Pi drains Kitty keyboard input, preventing CSI-u key sequences from leaking into the parent shell after exit.
+
 ## [0.2.0] - 2026-07-03
 
 ### Added
