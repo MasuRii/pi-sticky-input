@@ -22,6 +22,7 @@ interface ActiveTerminalModes {
 
 interface TuiStopPatch {
   originalStop: TUI["stop"];
+  originalDrainInput?: TUI["terminal"]["drainInput"];
 }
 
 type TuiWithStopPatch = TUI & {
@@ -125,14 +126,33 @@ function installStopPatch(tui: TUI): void {
   }
 
   const originalStop = patchedTui.stop;
-  patchedTui.__piStickyInputStopPatch = { originalStop };
+  const originalDrainInput = patchedTui.terminal.drainInput;
+  patchedTui.__piStickyInputStopPatch = { originalStop, originalDrainInput };
+
+  // Restore the primary screen before Pi pops screen-local keyboard modes.
+  // Direct TUI stops (for example, external-editor handoff) skip drainInput.
   patchedTui.stop = function piStickyInputStopPatch(this: TUI): void {
     try {
-      originalStop.call(this);
-    } finally {
       deactivateStickyTerminalSession();
+    } finally {
+      originalStop.call(this);
     }
   };
+
+  // Interactive shutdown drains Kitty key releases before it stops the TUI,
+  // so that path also needs to leave the alternate screen first.
+  if (typeof originalDrainInput === "function") {
+    patchedTui.terminal.drainInput = async function piStickyInputDrainPatch(
+      maxMs?: number,
+      idleMs?: number,
+    ): Promise<void> {
+      try {
+        deactivateStickyTerminalSession();
+      } finally {
+        await originalDrainInput.call(this, maxMs, idleMs);
+      }
+    };
+  }
 }
 
 function restoreStopPatch(tui: TUI): void {
@@ -143,6 +163,9 @@ function restoreStopPatch(tui: TUI): void {
   }
 
   patchedTui.stop = patch.originalStop;
+  if (patch.originalDrainInput) {
+    patchedTui.terminal.drainInput = patch.originalDrainInput;
+  }
   delete patchedTui.__piStickyInputStopPatch;
 }
 

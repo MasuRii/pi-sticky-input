@@ -7,13 +7,14 @@ const jiti = createJiti(path.join(__dirname, "terminal-session.test.cjs"), { int
 const terminalSession = jiti("../src/tui/terminal-session.ts");
 const config = jiti("../src/config/config.ts");
 
-function createRecordingTui(stop) {
+function createRecordingTui(stop, drainInput) {
   const events = [];
   const tui = {
     terminal: {
       write(data) {
         events.push(data);
       },
+      drainInput,
     },
     requestRender(force) {
       events.push(`requestRender:${force}`);
@@ -28,7 +29,7 @@ test("default terminal compatibility preserves native selection and links", () =
   assert.equal(config.DEFAULT_STICKY_INPUT_CONFIG.alternateScroll, false);
 });
 
-test("alternate screen is restored after TUI stop, not before it", () => {
+test("alternate screen is restored before TUI stop resets screen-local terminal modes", () => {
   const { events, tui } = createRecordingTui(() => events.push("original-stop"));
 
   terminalSession.activateStickyTerminalSession(tui, {
@@ -42,7 +43,26 @@ test("alternate screen is restored after TUI stop, not before it", () => {
 
   tui.stop();
 
-  assert.deepEqual(events, ["original-stop", "\x1b[?1006l\x1b[?1000l\x1b[?1049l"]);
+  assert.deepEqual(events, ["\x1b[?1006l\x1b[?1000l\x1b[?1049l", "original-stop"]);
+});
+
+test("alternate screen is restored before Pi drains Kitty keyboard input", async () => {
+  const { events, tui } = createRecordingTui(
+    () => events.push("original-stop"),
+    async () => events.push("original-drain-input"),
+  );
+
+  terminalSession.activateStickyTerminalSession(tui, {
+    alternateScreen: true,
+    alternateScroll: false,
+    mouseScroll: false,
+  });
+  events.length = 0;
+
+  await tui.terminal.drainInput();
+  tui.stop();
+
+  assert.deepEqual(events, ["\x1b[?1049l", "original-drain-input", "original-stop"]);
 });
 
 test("mouse tracking can toggle without leaving alternate screen", () => {
